@@ -1,85 +1,113 @@
-# @title
 import math
+from fastapi import FastAPI, Form
+from fastapi.responses import HTMLResponse
 
-def calculate_circulation():
-    print("=== UNIVERSAL BOILER CIRCULATION CALCULATOR ===")
-    print("Select unit system:")
-    print("1 - Metric (MPa, mm, meters, kg/s)")
-    print("2 - Imperial (psi, inches, feet, lb/h)")
+app = FastAPI()
 
-    choice = input("Enter 1 or 2: ").strip()
-    sys = "Metric" if choice == "1" else "Imperial"
+# Красивый HTML-интерфейс для браузера
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Boiler Circulation Calculator</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 600px; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin: 0 auto; }
+        h2 { color: #333; text-align: center; margin-bottom: 20px; }
+        h3 { border-bottom: 2px solid #ddd; padding-bottom: 5px; color: #444; margin-top: 20px; }
+        .form-group { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        label { font-size: 14px; color: #555; width: 60%; }
+        input, select { padding: 8px; width: 35%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+        button:hover { background: #0056b3; }
+        .results { margin-top: 25px; padding: 15px; border-radius: 6px; background: #e9ecef; }
+        .verdict { font-weight: bold; margin-top: 10px; white-space: pre-wrap; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .danger { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>Boiler Circulation Calculator</h2>
+    <form method="post">
+        <div class="form-group">
+            <label>Unit System:</label>
+            <select name="sys">
+                <option value="Imperial" {imp_sel}>Imperial (psi, in, ft, lb/h)</option>
+                <option value="Metric" {met_sel}>Metric (MPa, mm, m, kg/s)</option>
+            </select>
+        </div>
+        
+        <h3>1. Operating Mode</h3>
+        <div class="form-group"><label>Drum Pressure:</label><input type="number" step="any" name="raw_P" value="{raw_P}" required></div>
+        <div class="form-group"><label>Loop Height:</label><input type="number" step="any" name="raw_H" value="{raw_H}" required></div>
+        <div class="form-group"><label>Steam Capacity:</label><input type="number" step="any" name="raw_Q" value="{raw_Q}" required></div>
+        
+        <h3>2. Feeders Configuration</h3>
+        <div class="form-group"><label>Number of Feeders (pcs):</label><input type="number" name="N_down" value="{N_down}" required></div>
+        <div class="form-group"><label>Internal Diameter:</label><input type="number" step="any" name="raw_D_down" value="{raw_D_down}" required></div>
+        <div class="form-group"><label>Total Pipe Length:</label><input type="number" step="any" name="raw_L_down" value="{raw_L_down}" required></div>
+        <div class="form-group"><label>Resistance Coeff. (Zeta):</label><input type="number" step="any" name="Zeta_down" value="{Zeta_down}" required></div>
+        
+        <h3>3. Risers Configuration</h3>
+        <div class="form-group"><label>Number of Risers (pcs):</label><input type="number" name="N_rise" value="{N_rise}" required></div>
+        <div class="form-group"><label>Internal Diameter:</label><input type="number" step="any" name="raw_D_rise" value="{raw_D_rise}" required></div>
+        <div class="form-group"><label>Total Pipe Length:</label><input type="number" step="any" name="raw_L_rise" value="{raw_L_rise}" required></div>
+        <div class="form-group"><label>Resistance Coeff. (Zeta):</label><input type="number" step="any" name="Zeta_rise" value="{Zeta_rise}" required></div>
+        
+        <button type="submit">CALCULATE</button>
+    </form>
 
-    print(f"\nSelected system: {'Metric' if sys == 'Metric' else 'Imperial'}\n")
+    {result_block}
+</div>
+</body>
+</html>
+"""
 
+@app.get("/", response_class=HTMLResponse)
+async def home():
+    # Начальное состояние страницы с нулевыми полями
+    return HTML_TEMPLATE.format(
+        imp_sel="selected", met_sel="", raw_P=0, raw_H=0, raw_Q=0,
+        N_down=0, raw_D_down=0, raw_L_down=0, Zeta_down=0,
+        N_rise=0, raw_D_rise=0, raw_L_rise=0, Zeta_rise=0,
+        result_block=""
+    )
+
+@app.post("/", response_class=HTMLResponse)
+async def calculate(
+    sys: str = Form(...), raw_P: float = Form(...), raw_H: float = Form(...), raw_Q: float = Form(...),
+    N_down: int = Form(...), raw_D_down: float = Form(...), raw_L_down: float = Form(...), Zeta_down: float = Form(...),
+    N_rise: int = Form(...), raw_D_rise: float = Form(...), raw_L_rise: float = Form(...), Zeta_rise: float = Form(...),
+):
     try:
-        # 1. DATA INPUT
         if sys == "Metric":
-            raw_P = float(input("Drum pressure (MPa) [e.g., 4.0]: ").replace(',', '.'))
-            raw_H = float(input("Circulation loop height (meters) [e.g., 12.0]: ").replace(',', '.'))
-            raw_Q = float(input("Loop steam capacity (kg/s) [e.g., 2.5]: ").replace(',', '.'))
-
-            N_down = int(input("Number of feeders (pcs) [e.g., 4]: "))
-            raw_D_down = float(input("Feeders internal diameter (mm) [6\" ~ 150]: ").replace(',', '.'))
-            raw_L_down = float(input("Single feeder pipe length (meters) [e.g., 15.0]: ").replace(',', '.'))
-            Zeta_down = float(input("Feeders local resistance coefficient (Zeta) [e.g., 2.5]: ").replace(',', '.'))
-
-            N_rise = int(input("Number of risers (pcs) [e.g., 5]: "))
-            raw_D_rise = float(input("Risers internal diameter (mm) [8\" ~ 200]: ").replace(',', '.'))
-            raw_L_rise = float(input("Single riser pipe length (meters) [e.g., 14.0]: ").replace(',', '.'))
-            Zeta_rise = float(input("Risers local resistance coefficient (Zeta) [e.g., 2.0]: ").replace(',', '.'))
-
-            # Convert to SI
-            P_MPa = raw_P
-            H_m = raw_H
-            Q_kg_s = raw_Q
-            D_down_m = raw_D_down / 1000.0
-            L_down_m = raw_L_down
-            D_rise_m = raw_D_rise / 1000.0
-            L_rise_m = raw_L_rise
+            P_MPa, H_m, Q_kg_s = raw_P, raw_H, raw_Q
+            D_down_m, L_down_m = raw_D_down / 1000.0, raw_L_down
+            D_rise_m, L_rise_m = raw_D_rise / 1000.0, raw_L_rise
+            v_unit = "m/s"
         else:
-            raw_P = float(input("Drum pressure (psi) [e.g., 580]: ").replace(',', '.'))
-            raw_H = float(input("Circulation loop height (feet) [e.g., 20.0]: ").replace(',', '.'))
-            raw_Q = float(input("Loop steam capacity (lb/h) [e.g., 20000]: ").replace(',', '.'))
+            P_MPa = raw_P * 0.00689476
+            H_m = raw_H * 0.3048
+            Q_kg_s = raw_Q * 0.000125998
+            D_down_m = raw_D_down * 0.0254
+            L_down_m = raw_L_down * 0.3048
+            D_rise_m = raw_D_rise * 0.0254
+            L_rise_m = raw_L_rise * 0.3048
+            v_unit = "ft/s"
 
-            N_down = int(input("Number of feeders (pcs) [e.g., 4]: "))
-            raw_D_down = float(input("Feeders internal diameter (inches) [e.g., 6]: ").replace(',', '.'))
-            raw_L_down = float(input("Single feeder pipe length (feet) [e.g., 45.0]: ").replace(',', '.'))
-            Zeta_down = float(input("Feeders local resistance coefficient (Zeta) [e.g., 2.5]: ").replace(',', '.'))
-
-            N_rise = int(input("Number of risers (pcs) [e.g., 5]: "))
-            raw_D_rise = float(input("Risers internal diameter (inches) [e.g., 8]: ").replace(',', '.'))
-            raw_L_rise = float(input("Single riser pipe length (feet) [e.g., 42.0]: ").replace(',', '.'))
-            Zeta_rise = float(input("Risers local resistance coefficient (Zeta) [e.g., 2.0]: ").replace(',', '.'))
-
-            # Convert Imperial to SI
-            P_MPa = raw_P * 0.00689476             # psi to MPa
-            H_m = raw_H * 0.3048                    # ft to m
-            Q_kg_s = raw_Q * 0.000125998            # lb/h to kg/s
-            D_down_m = raw_D_down * 0.0254          # inches to m
-            L_down_m = raw_L_down * 0.3048          # feet to m
-            D_rise_m = raw_D_rise * 0.0254          # inches to m
-            L_rise_m = raw_L_rise * 0.3048          # feet to m
-
-        # 2. PRESSURE LIMIT CHECK
         if P_MPa < 0.1 or P_MPa > 16:
-            print("\n❌ Error: Pressure is out of stable engineering algorithm limits (0.1 - 16 MPa / 14.5 - 2320 psi).")
-            return
+            raise ValueError("Pressure out of stable limits (0.1 - 16 MPa / 14.5 - 2320 psi).")
 
-        # Fluid physical properties approximation
         rho_w = 1000.0 - 55.0 * P_MPa
         rho_s = 5.0 * P_MPa
-        viscosity = 1.1e-4
-        k_rough = 0.00015
+        viscosity, k_rough = 1.1e-4, 0.00015
 
         F_down = N_down * (math.pi * D_down_m**2 / 4)
         F_rise = N_rise * (math.pi * D_rise_m**2 / 4)
 
-        v_down = 0.01
-        step = 0.001
-        balance_found = False
+        v_down, step, balance_found = 0.01, 0.001, False
 
-        # 3. ITERATIVE CYCLE FOR BALANCE SEARCH
         while v_down < 10.0:
             G_circ = rho_w * v_down * F_down
             if G_circ <= Q_kg_s:
@@ -88,16 +116,11 @@ def calculate_circulation():
             K = G_circ / Q_kg_s
             x_avg = 0.5 / K
             rho_mix = 1 / ((x_avg / rho_s) + ((1 - x_avg) / rho_w))
-
             S_dv = 9.81 * H_m * (rho_w - rho_mix)
 
             lambda_down = 0.11 * (k_rough/D_down_m + 68/(rho_w * v_down * D_down_m / viscosity))**0.25
             v_rise = G_circ / (rho_mix * F_rise)
-
-            if rho_mix <= 0 or v_rise <= 0:
-                lambda_rise = 0.02
-            else:
-                lambda_rise = 0.11 * (k_rough/D_rise_m + 68/(rho_mix * v_rise * D_rise_m / viscosity))**0.25
+            lambda_rise = 0.11 * (k_rough/D_rise_m + 68/(0.01 if rho_mix <= 0 else (rho_mix * v_rise * D_rise_m / viscosity)))**0.25
 
             dP_down = (lambda_down * L_down_m / D_down_m + Zeta_down) * (rho_w * v_down**2 / 2)
             dP_rise = (lambda_rise * L_rise_m / D_rise_m + Zeta_rise) * (rho_mix * v_rise**2 / 2)
@@ -108,53 +131,45 @@ def calculate_circulation():
             v_down += step
 
         if not balance_found:
-            print("\n❌ Calculation Error: Hydraulic resistance is too high. Circulation is blocked!")
-            return
+            raise Exception("Hydraulic resistance is too high. Circulation is blocked!")
 
-        # Convert back to selected output units
-        if sys == "Metric":
-            display_v = v_down
-            v_unit = "m/s"
-        else:
-            display_v = v_down / 0.3048
-            v_unit = "ft/s"
-
-        # 4. OUTPUT RESULTS
-        print("\n" + "="*40)
-        print(" CALCULATION RESULTS:")
-        print("="*40)
-        print(f"Velocity in feeders:                {display_v:.2f} {v_unit}")
-        print(f"Loop circulation ratio (K):         {K:.1f}")
-        print("-"*40)
-        print("RELIABILITY ANALYSIS & VERDICT:")
-        print("-"*40)
+        display_v = v_down if sys == "Metric" else v_down / 0.3048
 
         verdict = ""
         if v_down > 2.5:
             v_lim = "2.5 m/s" if sys == "Metric" else "8.2 ft/s"
-            verdict += f"⚠️ Warning! Velocity in feeders is too HIGH (> {v_lim}).\nRECOMMENDATION: INCREASE THE DIAMETER or quantity of feeders to reduce head losses.\n\n"
+            verdict += f"⚠️ Warning! Velocity in feeders is too HIGH (> {v_lim}). Consider increasing diameter.\\n"
         elif v_down < 0.4:
             v_lim = "0.4 m/s" if sys == "Metric" else "1.3 ft/s"
-            verdict += f"⚠️ Flow velocity is too low (< {v_lim}). Risk of flow stagnation or circulation reversal.\n\n"
-
+            verdict += f"⚠️ Warning! Flow velocity is too low (< {v_lim}). Risk of flow stagnation.\\n"
+            
         if K < 10.0:
-            verdict += "❌ CRITICALLY LOW CIRCULATION RATIO (K < 10)!\nWater evaporates too fast. Risers are at risk of burnout due to boiling crisis.\nRECOMMENDATION: Urgently INCREASE THE DIAMETER of feeders OR risers to improve flow rate.\n\n"
-
-        if dP_down > (dP_down + dP_rise) * 0.65:
-            verdict += "💡 Engineering note: Feeders friction resistance dominates the system. Avoid adding extra bends/elbows when moving nozzles.\n\n"
+            verdict += "❌ CRITICALLY LOW CIRCULATION RATIO (K < 10)! Urgently increase diameters to prevent burnout.\\n"
 
         if verdict == "":
-            print("✅ Hydraulic loop is completely stable!")
-            print("Flow velocities are safe, and the circulation ratio is within norms. Pipe diameter changes are not required.")
+            verdict = "✅ Hydraulic loop is completely stable! Diameters are safe."
+            v_class = "success"
         else:
-            print(verdict.strip())
-        print("="*40)
+            v_class = "danger"
 
-    except ValueError:
-        print("\n❌ Error: Please enter numeric values only. Use a dot as a decimal separator (e.g., 15.5).")
+        result_block = f"""
+        <div class="results">
+            <strong>Velocity in feeders:</strong> {display_v:.2f} {v_unit}<br>
+            <strong>Circulation ratio (K):</strong> {K:.1f}<br>
+            <div class="verdict {v_class}">{verdict}</div>
+        </div>
+        """
+    except Exception as e:
+        result_block = f'<div class="results"><div class="verdict danger">❌ Error: {str(e)}</div></div>'
 
-if __name__ == "__main__":
-    calculate_circulation()
+    return HTML_TEMPLATE.format(
+        imp_sel="selected" if sys == "Imperial" else "",
+        met_sel="selected" if sys == "Metric" else "",
+        raw_P=raw_P, raw_H=raw_H, raw_Q=raw_Q,
+        N_down=N_down, raw_D_down=raw_D_down, raw_L_down=raw_L_down, Zeta_down=Zeta_down,
+        N_rise=N_rise, raw_D_rise=raw_D_rise, raw_L_rise=raw_L_rise, Zeta_rise=Zeta_rise,
+        result_block=result_block
+    )
 
-# Обязательная точка интеграции с Serverless-платформой Vercel
+# Экспорт для Vercel Serverless
 app = app
