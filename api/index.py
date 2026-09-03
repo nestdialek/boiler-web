@@ -66,7 +66,7 @@ HTML_TEMPLATE = """
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
-    # Отображение пустой формы по умолчанию
+    # Отображение пустой формы по умолчанию при первом входе на сайт
     return HTML_TEMPLATE.format(
         imp_sel="selected", met_sel="", raw_P=0, raw_H=0, raw_Q=0,
         N_down=0, raw_D_down=0, raw_L_down=0, Zeta_down=0,
@@ -81,7 +81,7 @@ async def calculate(
     N_rise: int = Form(...), raw_D_rise: float = Form(...), raw_L_rise: float = Form(...), Zeta_rise: float = Form(...),
 ):
     try:
-        # Конвертация единиц в СИ
+        # Конвертация единиц в СИ для ядра гидравлического расчета
         if sys == "Metric":
             P_MPa, H_m, Q_kg_s = raw_P, raw_H, raw_Q
             D_down_m, L_down_m = raw_D_down / 1000.0, raw_L_down
@@ -136,17 +136,17 @@ async def calculate(
 
         display_v = v_down if sys == "Metric" else v_down / 0.3048
 
-        # Формирование вердикта
-        verdict, is_danger = "", False
+        # Формирование вердикта о надежности контура
+        verdict = ""
         if v_down > 2.5:
-            verdict += "⚠️ Warning! Velocity in feeders is too HIGH. Consider increasing diameter.\\n"
-            is_danger = True
+            v_lim = "2.5 m/s" if sys == "Metric" else "8.2 ft/s"
+            verdict += f"⚠️ Warning! Velocity in feeders is too HIGH (> {v_lim}). Consider increasing diameter.\\n"
         elif v_down < 0.4:
-            verdict += "⚠️ Warning! Flow velocity is too low. Risk of flow stagnation.\\n"
-            is_danger = True
+            v_lim = "0.4 m/s" if sys == "Metric" else "1.3 ft/s"
+            verdict += f"⚠️ Warning! Flow velocity is too low (< {v_lim}). Risk of flow stagnation.\\n"
+            
         if K < 10.0:
-            verdict += "❌ CRITICALLY LOW CIRCULATION RATIO (K < 10)! Urgently increase diameters.\\n"
-            is_danger = True
+            verdict += "❌ CRITICALLY LOW CIRCULATION RATIO (K < 10)! Urgently increase diameters to prevent burnout.\\n"
 
         if verdict == "":
             verdict = "✅ Hydraulic loop is completely stable! Diameters are safe."
@@ -164,6 +164,7 @@ async def calculate(
     except Exception as e:
         result_block = f'<div class="results"><div class="verdict danger">❌ Error: {str(e)}</div></div>'
 
+    # Передача значений обратно в поля, чтобы они не стирались после отправки формы
     return HTML_TEMPLATE.format(
         imp_sel="selected" if sys == "Imperial" else "",
         met_sel="selected" if sys == "Metric" else "",
@@ -172,3 +173,6 @@ async def calculate(
         N_rise=N_rise, raw_D_rise=raw_D_rise, raw_L_rise=raw_L_rise, Zeta_rise=Zeta_rise,
         result_block=result_block
     )
+
+# Обязательная точка интеграции с Serverless-платформой Vercel
+app = app
