@@ -4,26 +4,26 @@ from fastapi.responses import HTMLResponse
 
 app = FastAPI()
 
-# Красивый HTML-интерфейс для браузера
+# HTML-шаблон страницы калькулятора с экранированием скобок для CSS
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
     <title>Boiler Circulation Calculator</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
-        .container { max-width: 600px; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin: 0 auto; }
-        h2 { color: #333; text-align: center; margin-bottom: 20px; }
-        h3 { border-bottom: 2px solid #ddd; padding-bottom: 5px; color: #444; margin-top: 20px; }
-        .form-group { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        label { font-size: 14px; color: #555; width: 60%; }
-        input, select { padding: 8px; width: 35%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; }
-        button:hover { background: #0056b3; }
-        .results { margin-top: 25px; padding: 15px; border-radius: 6px; background: #e9ecef; }
-        .verdict { font-weight: bold; margin-top: 10px; white-space: pre-wrap; padding: 10px; border-radius: 4px; }
-        .success { background: #d4edda; color: #155724; }
-        .danger { background: #f8d7da; color: #721c24; }
+        body {{ font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }}
+        .container {{ max-width: 600px; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin: 0 auto; }}
+        h2 {{ color: #333; text-align: center; margin-bottom: 20px; }}
+        h3 {{ border-bottom: 2px solid #ddd; padding-bottom: 5px; color: #444; margin-top: 20px; }}
+        .form-group {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }}
+        label {{ font-size: 14px; color: #555; width: 60%; }}
+        input, select {{ padding: 8px; width: 35%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }}
+        button {{ width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; }}
+        button:hover {{ background: #0056b3; }}
+        .results {{ margin-top: 25px; padding: 15px; border-radius: 6px; background: #e9ecef; }}
+        .verdict {{ font-weight: bold; margin-top: 10px; white-space: pre-wrap; padding: 10px; border-radius: 4px; }}
+        .success {{ background: #d4edda; color: #155724; }}
+        .danger {{ background: #f8d7da; color: #721c24; }}
     </style>
 </head>
 <body>
@@ -66,7 +66,6 @@ HTML_TEMPLATE = """
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
-    # Начальное состояние страницы с нулевыми полями
     return HTML_TEMPLATE.format(
         imp_sel="selected", met_sel="", raw_P=0, raw_H=0, raw_Q=0,
         N_down=0, raw_D_down=0, raw_L_down=0, Zeta_down=0,
@@ -171,5 +170,4 @@ async def calculate(
         result_block=result_block
     )
 
-# Экспорт для Vercel Serverless
 app = app
